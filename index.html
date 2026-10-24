@@ -34,7 +34,8 @@
   }
   /* 横幅が狭いときは、画像の下に設定を並べる */
   @media (max-width: 900px) {
-    body { display: block; height: auto; overflow: auto; }
+    /* 念のため：どこかが少しはみ出しても、ページが横にスライドしないようにする */
+    body { display: block; height: auto; overflow-x: hidden; overflow-y: auto; }
     .stage-col { height: 70vh; }
     .side { height: auto; overflow: visible; }
   }
@@ -268,17 +269,21 @@
           width: 17px; height: 17px; border: 1px solid var(--sub); border-radius: 50%; color: var(--sub);
           font-size: 11px; font-weight: 600; font-style: normal; cursor: help; outline: none; }
   .info:hover, .info:focus-visible { color: var(--text); border-color: var(--text); }
-  .info .tip { position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-70%); width: 250px;
+  /* 吹き出しは、見えないときは場所も取らない（スマホで横にはみ出してスライドしないように）。
+     開いたときに画面からはみ出す分は、JS で --dx だけずらす */
+  .info .tip { position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-70%);
+               translate: var(--dx, 0px) 0; width: min(250px, calc(100vw - 24px));
                background: var(--btn); color: var(--btn-text); font-size: 12px; font-weight: 400; line-height: 1.55;
                padding: 8px 11px; border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,.25);
                white-space: normal;   /* 項目名の「折り返さない」設定を引き継がず、枠の中で折り返す */
-               opacity: 0; visibility: hidden; transition: opacity .12s; pointer-events: none; z-index: 5; }
-  .info .tip::after { content: ''; position: absolute; top: 100%; left: 70%; border: 6px solid transparent;
+               display: none; pointer-events: none; z-index: 5; }
+  .info .tip::after { content: ''; position: absolute; top: 100%; left: calc(70% - var(--dx, 0px)); border: 6px solid transparent;
                       border-top-color: var(--btn); transform: translateX(-50%); }
-  .info:hover .tip, .info:focus-visible .tip { opacity: 1; visibility: visible; }
-  /* 左寄りの項目では、吹き出しを右向きに開いて、列の外にはみ出さないようにする */
+  /* マウスを乗せる・タップして選ぶと、JS が位置を決めてから show を付けて出す */
+  .info.show .tip { display: block; }
+  /* 左寄りの項目では、吹き出しを右向きに開く */
   .info.open-right .tip { transform: translateX(-15%); }
-  .info.open-right .tip::after { left: 15%; }
+  .info.open-right .tip::after { left: calc(15% - var(--dx, 0px)); }
   .label .info { margin-left: 2px; }
   .volume select {
     font: inherit; font-size: 13px; color: var(--text); background: var(--panel);
@@ -301,6 +306,15 @@
   .chip button { background: none; border: none; color: inherit; font: inherit; cursor: pointer; padding: 4px 4px 4px 10px; }
   .chip button.del { padding: 4px 8px 4px 4px; opacity: .6; }
   .chip button:hover { color: var(--text); opacity: 1; }
+  /* 計測中は、呼び出しのボタンだけ押せない（保存と削除はできる） */
+  .chip button:disabled { opacity: .45; cursor: default; }
+  .fav-form { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+  .chip-ask { color: var(--text); }
+  .chip-ask .ask-text { padding: 4px 4px 4px 10px; }
+  .chip .ask-yes { color: #e5534b; font-weight: 600; }
+  .fav-note { font-size: 12px; color: #e5534b; }
+  .fav-form input { font: inherit; font-size: 13px; width: 170px; max-width: 100%; padding: 4px 8px;
+                    border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); }
 
   /* 色の設定・バックアップ（折りたたみ） */
   details { font-size: 13px; color: var(--sub); }
@@ -312,6 +326,12 @@
     border: 1px solid var(--line); border-radius: 6px; padding: 2px 4px; cursor: pointer;
   }
   .colors input[type=color] { width: 32px; height: 24px; border: 1px solid var(--line); border-radius: 6px; padding: 0; background: none; cursor: pointer; }
+  .colors label { cursor: pointer; }
+  /* 指で操作する端末（スマホ・タブレット）では、色のボタンを押しやすい大きさにする */
+  @media (pointer: coarse) {
+    .colors input[type=color] { width: 44px; height: 44px; border-radius: 10px; }
+    .colors label { min-height: 44px; }
+  }
   .backup { display: flex; flex-direction: column; gap: 8px; padding: 10px 4px 0; }
   .backup .btns { display: flex; gap: 8px; flex-wrap: wrap; }
 
@@ -343,6 +363,19 @@
   kbd { font-family: inherit; font-size: 12px; border: 1px solid var(--line); border-bottom-width: 2px;
         border-radius: 5px; padding: 1px 6px; background: var(--bg); }
   .modal-box .ghost { align-self: flex-end; }
+  /* ページの中のお知らせ・確認（ブラウザのダイアログの代わり） */
+  .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 50;
+           width: max-content; max-width: calc(100vw - 32px); padding: 10px 16px; border-radius: 10px;
+           background: var(--btn); color: var(--btn-text); font-size: 13px; line-height: 1.5; white-space: pre-line;
+           box-shadow: 0 4px 14px rgba(0,0,0,.3); }
+  .ui-dialog .modal-box { max-width: 400px; }
+  .ui-dialog .ui-msg { font-size: 14px; line-height: 1.6; }
+  .ui-dialog .ui-input { font: inherit; font-size: 15px; padding: 6px 10px; border: 1px solid var(--line);
+                         border-radius: 8px; background: var(--bg); color: var(--text); }
+  .ui-dialog .ui-btns { display: flex; justify-content: flex-end; gap: 8px; }
+  .ui-dialog .ui-btns .ghost { align-self: auto; }
+  .ui-dialog .ui-ok { color: var(--text); font-weight: 600; }
+  .ui-dialog .ui-ok.danger { color: #e5534b; }
   /* 数字入力の上下の三角（スピンボタン）を出さない。増減はキーボードの↑↓でできる */
   input[type=number] { -moz-appearance: textfield; appearance: textfield; }
   input[type=number]::-webkit-inner-spin-button,
@@ -489,8 +522,9 @@
 
   <div class="panel" id="panel">
     <div class="panel-title" data-i18n="menuPanel"></div>
+    <!-- お気に入りは、計測中も登録・削除できるように、計測中に止める部分（menuSet）の外に置く -->
+    <div class="favs" id="favs"></div>
     <fieldset class="plain" id="menuSet">
-      <div class="favs" id="favs"></div>
       <div class="label"><span class="dot" style="background:var(--work)"></span><span data-i18n="stepsLabel"></span><span class="info" tabindex="0">i<span class="tip" role="tooltip" data-i18n="tipSteps"></span></span></div>
       <div class="steps" id="steps"></div>
       <div><button type="button" class="ghost" id="addStep" data-i18n="addStep"></button></div>
@@ -650,6 +684,7 @@ const I18N = {
     needWork: 'ポーズ時間を1秒以上、回数を1回以上にしてください。',
     soundPanel: '音の設定',
     favAdd: '＋ 今のメニューを保存', favName: 'メニューの名前', favDel: '削除',
+    favSave: '保存', favCancel: 'キャンセル', favDelYes: '削除', favDelNo: 'やめる', ok: 'OK',
     favDelAsk: '「{name}」を削除しますか？',
     preset1: 'クロッキー（段階）', preset2: 'ジェスチャー 30秒', preset3: 'じっくり 5分',
     dur: (h, m, s) => (h ? h + '時間' : '') + (m ? m + '分' : '') + (s || (!h && !m) ? s + '秒' : ''),
@@ -742,6 +777,7 @@ const I18N = {
     needWork: 'Set each pose time to at least 1 second and each count to at least 1.',
     soundPanel: 'Sound',
     favAdd: '+ Save this menu', favName: 'Name for this menu', favDel: 'Delete',
+    favSave: 'Save', favCancel: 'Cancel', favDelYes: 'Delete', favDelNo: 'Keep', ok: 'OK',
     favDelAsk: 'Delete "{name}"?',
     preset1: 'Croquis (steps)', preset2: 'Gesture 30s', preset3: 'Long 5min',
     dur: (h, m, s) => (h ? h + 'h' : '') + (m ? m + 'm' : '') + (s || (!h && !m) ? s + 's' : ''),
@@ -956,6 +992,12 @@ function updateFavicon() {
 }
 document.querySelectorAll('[data-color]').forEach(inp => {
   inp.addEventListener('input', () => { settings.colors[inp.dataset.color] = inp.value; applyColors(); save(); });
+  // iPhone・iPad の Safari は、横の文字をタップしても色の選択画面を開かないことがあるので、自分で開く
+  inp.closest('label').addEventListener('click', e => {
+    if (e.target === inp) return;
+    e.preventDefault();
+    inp.click();
+  });
 });
 $('colorReset').onclick = () => { settings.colors = { ...defaultColors }; applyColors(); save(); };
 applyColors();
@@ -989,10 +1031,9 @@ function renderFavs() {
     const del = document.createElement('button');
     del.type = 'button';
     del.className = 'del'; del.textContent = '×'; del.title = t('favDel');
-    del.onclick = () => {
-      if (!confirm(t('favDelAsk', { name: f.name }))) return;
+    del.onclick = () => askDelete(chip, f.name, () => {
       settings.favorites.splice(i, 1); save(); renderFavs();
-    };
+    });
     chip.append(load, del);
     box.append(chip);
   });
@@ -1000,15 +1041,122 @@ function renderFavs() {
   add.type = 'button';
   add.className = 'ghost'; add.textContent = t('favAdd');
   add.onclick = () => {
-    if (settings.favorites.length >= MAX_FAVS) { alert(t('favFull')); return; }
+    if (settings.favorites.length >= MAX_FAVS) { favNote(add, t('favFull')); return; }
     readSteps();
-    const def = settings.steps.map(st => `${short(st.work)}×${st.count}`).join('→');
-    const name = prompt(t('favName'), def);
-    if (name === null) return;
-    settings.favorites.push({ name: name.trim() || def, steps: settings.steps.map(st => ({ ...st })), rest: settings.rest });
-    save(); renderFavs();
+    const steps = settings.steps.map(st => ({ ...st })), rest = settings.rest;
+    const def = steps.map(st => `${short(st.work)}×${st.count}`).join('→');
+    openFavForm(add, def, name => {
+      settings.favorites.push({ name, steps, rest });
+      save(); renderFavs();
+    });
   };
   box.append(add);
+  lockFavs();
+}
+// 名前の入力欄をページの中に出す（ブラウザの入力ダイアログはページの動きを止めてしまい、
+// 計測中だと区切りの音が鳴らなくなるため）
+function openFavForm(add, def, onSave) {
+  const form = document.createElement('span');
+  form.className = 'fav-form';
+  const inp = document.createElement('input');
+  inp.type = 'text'; inp.value = def; inp.maxLength = 40;
+  inp.placeholder = t('favName'); inp.setAttribute('aria-label', t('favName'));
+  const ok = document.createElement('button');
+  ok.type = 'button'; ok.className = 'ghost'; ok.textContent = t('favSave');
+  const cancel = document.createElement('button');
+  cancel.type = 'button'; cancel.className = 'ghost'; cancel.textContent = t('favCancel');
+  const done = keep => keep ? onSave(inp.value.trim() || def) : renderFavs();
+  ok.onclick = () => done(true);
+  cancel.onclick = () => done(false);
+  inp.onkeydown = e => {
+    if (e.key === 'Enter') { e.preventDefault(); done(true); }
+    else if (e.key === 'Escape') { e.preventDefault(); done(false); }
+  };
+  form.append(inp, ok, cancel);
+  add.replaceWith(form);
+  inp.focus(); inp.select();
+}
+// ---- ページの中のお知らせ・確認・名前の入力 ----
+// ブラウザのダイアログ（alert / confirm / prompt）は、開いているあいだページの動きを止めて
+// 計測中のタイマーも止まってしまうため、代わりにページの中で表示する
+function toast(msg, ms = 4000) {
+  document.querySelector('.toast')?.remove();
+  const el = document.createElement('div');
+  el.className = 'toast'; el.setAttribute('role', 'status'); el.textContent = msg;
+  document.body.append(el);
+  setTimeout(() => el.remove(), ms);
+}
+// 確認（input なし）は true / false、名前の入力（input に初期値）は 文字列 / null を返す
+function uiDialog(msg, { input = null, okText = t('ok'), danger = false } = {}) {
+  return new Promise(resolve => {
+    const wrap = document.createElement('div');
+    wrap.className = 'modal ui-dialog';
+    const box = document.createElement('div');
+    box.className = 'modal-box'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true');
+    const p = document.createElement('div');
+    p.className = 'ui-msg'; p.textContent = msg;
+    box.append(p);
+    let inp = null;
+    if (input !== null) {
+      inp = document.createElement('input');
+      inp.type = 'text'; inp.className = 'ui-input'; inp.value = input; inp.maxLength = 40;
+      inp.setAttribute('aria-label', msg);
+      box.append(inp);
+    }
+    const btns = document.createElement('div');
+    btns.className = 'ui-btns';
+    const cancel = document.createElement('button');
+    cancel.type = 'button'; cancel.className = 'ghost'; cancel.textContent = t('favCancel');
+    const ok = document.createElement('button');
+    ok.type = 'button'; ok.className = 'ghost ui-ok' + (danger ? ' danger' : ''); ok.textContent = okText;
+    btns.append(cancel, ok);
+    box.append(btns);
+    wrap.append(box);
+    document.body.append(wrap);
+    const close = v => { wrap.remove(); resolve(v); };
+    ok.onclick = () => close(inp ? inp.value : true);
+    cancel.onclick = () => close(inp ? null : false);
+    wrap.addEventListener('click', e => { if (e.target === wrap) cancel.onclick(); });
+    // キー操作（スペースで開始など）が裏で動かないよう、ここで止める
+    wrap.addEventListener('keydown', e => {
+      e.stopPropagation();
+      if (e.key === 'Escape') { e.preventDefault(); cancel.onclick(); }
+      else if (e.key === 'Enter' && e.target === inp) { e.preventDefault(); ok.onclick(); }
+    });
+    (inp || ok).focus();
+    inp?.select();
+  });
+}
+
+// 削除の確認も、ページの中で行う（ブラウザの確認ダイアログは、計測中のタイマーを止めてしまうため）。
+// しばらく押さなければ、元の表示に戻す
+function askDelete(chip, name, onYes) {
+  const ask = document.createElement('span');
+  ask.className = 'chip chip-ask';
+  const msg = document.createElement('span');
+  msg.className = 'ask-text'; msg.textContent = t('favDelAsk', { name });
+  const yes = document.createElement('button');
+  yes.type = 'button'; yes.className = 'ask-yes'; yes.textContent = t('favDelYes');
+  const no = document.createElement('button');
+  no.type = 'button'; no.textContent = t('favDelNo');
+  const timer = setTimeout(() => renderFavs(), 6000);
+  yes.onclick = () => { clearTimeout(timer); onYes(); };
+  no.onclick = () => { clearTimeout(timer); renderFavs(); };
+  ask.append(msg, yes, no);
+  chip.replaceWith(ask);
+  no.focus();
+}
+// 短いお知らせを、ボタンの横に数秒だけ出す（ブラウザのダイアログの代わり）
+function favNote(after, text) {
+  document.querySelector('#favs .fav-note')?.remove();
+  const note = document.createElement('span');
+  note.className = 'fav-note'; note.textContent = text; note.setAttribute('role', 'status');
+  after.after(note);
+  setTimeout(() => note.remove(), 3000);
+}
+// 計測中は、お気に入りの呼び出しだけできないようにする
+function lockFavs() {
+  document.querySelectorAll('#favs .chip:not(.chip-ask) button:not(.del)').forEach(b => b.disabled = active());
 }
 function loadFav(i) {
   const f = settings.favorites[i];
@@ -1262,7 +1410,7 @@ async function addRecords(recs) {
   if (!recs.length) return;
   // 上限を超える分は追加しない
   const room = MAX_IMAGES - images.length;
-  if (room <= 0) { alert(t('imgFull', { max: MAX_IMAGES })); return; }
+  if (room <= 0) { toast(t('imgFull', { max: MAX_IMAGES })); return; }
   const skipped = recs.length > room;
   if (skipped) recs = recs.slice(0, room);
   const noCurrent = !curItem() || curItem().setId !== settings.curSet;
@@ -1277,8 +1425,10 @@ async function addRecords(recs) {
   }
   saveOrder(); renderSets(); renderStrip();
   if (noCurrent) showImage(firstId);
-  if (skipped) alert(t('imgPartial', { max: MAX_IMAGES, n: recs.length }));
-  if (failed) alert(t('saveFail', { n: failed }));
+  const notes = [];
+  if (skipped) notes.push(t('imgPartial', { max: MAX_IMAGES, n: recs.length }));
+  if (failed) notes.push(t('saveFail', { n: failed }));
+  if (notes.length) toast(notes.join('\n'), failed ? 8000 : 4000);
 }
 const isImageFile = f => f.type.startsWith('image/') || /\.(jpe?g|png|gif|webp|bmp|avif|svg)$/i.test(f.name);
 const byName = (a, b) => a.name.localeCompare(b.name, undefined, { numeric: true });
@@ -1335,24 +1485,24 @@ function renderSets() {
     b.className = 'ghost set-act'; b.textContent = t(key); b.onclick = fn; b.disabled = active();
     box.append(b);
   };
-  act('newSet', () => {
-    const name = prompt(t('setName'), t('newSetName', { n: settings.sets.length + 1 }));
+  act('newSet', async () => {
+    const name = await uiDialog(t('setName'), { input: t('newSetName', { n: settings.sets.length + 1 }) });
     if (name === null) return;
     const s = { id: newId(), name: name.trim() || t('newSetName', { n: settings.sets.length + 1 }) };
     settings.sets.push(s); save(); switchSet(s.id);
   });
-  act('renameSet', () => {
+  act('renameSet', async () => {
     const s = settings.sets.find(x => x.id === settings.curSet);
-    const name = prompt(t('setName'), s.name);
+    const name = await uiDialog(t('setName'), { input: s.name });
     if (name === null || !name.trim()) return;
     s.name = name.trim(); save(); renderSets();
   });
   act('clearAll', clearSet);
   act('deleteSet', async () => {
-    if (settings.sets.length <= 1) { alert(t('lastSet')); return; }
+    if (settings.sets.length <= 1) { toast(t('lastSet')); return; }
     const s = settings.sets.find(x => x.id === settings.curSet);
     const list = setImgs();
-    if (!confirm(t('deleteSetAsk', { name: s.name, n: list.length }))) return;
+    if (!await uiDialog(t('deleteSetAsk', { name: s.name, n: list.length }), { okText: t('favDelYes'), danger: true })) return;
     for (const im of list) { revokeItem(im); try { await idb.del(im.id); } catch (e) {} }
     images = images.filter(im => im.setId !== s.id);
     settings.sets = settings.sets.filter(x => x.id !== s.id);
@@ -1500,7 +1650,7 @@ $('shuffleBtn').onclick = () => {
 // 今のセットの画像をすべて削除（セット自体は残す）
 async function clearSet() {
   const list = setImgs();
-  if (!list.length || !confirm(t('clearAsk'))) return;
+  if (!list.length || !await uiDialog(t('clearAsk'), { okText: t('favDelYes'), danger: true })) return;
   for (const im of list) { revokeItem(im); try { await idb.del(im.id); } catch (e) {} }
   images = images.filter(im => im.setId !== settings.curSet);
   curId = null;
@@ -1515,7 +1665,7 @@ $('fileInput').onchange = e => { addFiles(e.target.files, false); e.target.value
 const addFromUrlBox = () => {
   const v = $('urlInput').value.trim();
   if (!v) return;
-  if (!looksLikeUrl(v)) { alert(t('urlBad')); return; }
+  if (!looksLikeUrl(v)) { toast(t('urlBad')); return; }
   addUrls([v]); $('urlInput').value = '';
 };
 $('urlAdd').onclick = addFromUrlBox;
@@ -1608,9 +1758,9 @@ async function importBackup(file) {
   let data = null;
   try { data = JSON.parse(await file.text()); } catch (e) {}
   if (!data || data.app !== 'IntervaLoop for Artists' || !Array.isArray(data.images) || typeof data.settings !== 'object') {
-    alert(t('importBad')); return;
+    toast(t('importBad'), 6000); return;
   }
-  if (!confirm(t('importAsk', { n: data.images.length }))) return;
+  if (!await uiDialog(t('importAsk', { n: data.images.length }))) return;
   const btn = $('importBtn');
   btn.disabled = true; btn.textContent = t('importing');
   const list = data.images.slice(0, MAX_IMAGES);
@@ -1628,9 +1778,15 @@ async function importBackup(file) {
   }
   settings = { ...defaults, ...data.settings, imageOrder: ids };
   save();
-  if (failed) alert(t('saveFail', { n: failed }));
+  // 読み込み直したあとに表示する（ページを読み込み直すと、お知らせが消えてしまうため）
+  if (failed) { try { sessionStorage.setItem(NOTICE_KEY, t('saveFail', { n: failed })); } catch (e) {} }
   location.reload();    // 読み込んだ設定で、最初から表示し直す
 }
+const NOTICE_KEY = 'intervaLoopArtistsNotice';
+try {
+  const notice = sessionStorage.getItem(NOTICE_KEY);
+  if (notice) { sessionStorage.removeItem(NOTICE_KEY); setTimeout(() => toast(notice, 8000), 300); }
+} catch (e) {}
 $('exportBtn').onclick = () => exportBackup();
 $('importBtn').onclick = () => $('importInput').click();
 $('importInput').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) importBackup(f); };
@@ -1826,6 +1982,7 @@ function render() {
   $('startBtn').textContent = t(state === 'paused' ? 'resume' : 'start');
   $('pauseBtn').disabled = state !== 'running';
   $('menuSet').disabled = active();
+  lockFavs();
   document.querySelectorAll('.set-tab, .set-act').forEach(b => b.disabled = active());
   $('subControls').classList.toggle('hidden', !active());
   ring.classList.toggle('active', active());
@@ -1971,7 +2128,7 @@ $('startBtn').onclick = () => {
   } else {
     readSteps();
     plan = works();
-    if (!plan.length || settings.steps.some(st => st.work <= 0 || st.count <= 0)) { alert(t('needWork')); return; }
+    if (!plan.length || settings.steps.some(st => st.work <= 0 || st.count <= 0)) { toast(t('needWork')); return; }
     k = 0; sessionLog = []; reviewHidden = false; state = 'running';
     const first = firstUsable();
     if (first) showImage(first.id);
@@ -2065,6 +2222,38 @@ const refreshLogo = () => {
 addEventListener('scroll', refreshLogo, { passive: true });
 $('side').addEventListener('scroll', refreshLogo, { passive: true });
 addEventListener('resize', refreshLogo);
+
+// ⓘ の吹き出し：出す前に、画面の端からはみ出さない位置（--dx）を計算してから出す。
+// 先に出すと、はみ出した分だけページが一瞬広がり、正しい画面の幅が測れないため
+function showTip(info) {
+  const tip = info.querySelector('.tip');
+  if (!tip) return;
+  const W = document.documentElement.clientWidth, m = 8;
+  const w = Math.min(250, W - 24);                       // CSS の width と同じ
+  const ir = info.getBoundingClientRect();
+  const left = ir.left + ir.width / 2 - w * (info.classList.contains('open-right') ? 0.15 : 0.7);
+  let dx = 0;
+  if (left + w > W - m) dx = W - m - (left + w);
+  if (left + dx < m) dx = m - left;
+  tip.style.setProperty('--dx', dx + 'px');
+  info.classList.add('show');
+}
+function hideTip(info) {
+  if (info.matches(':hover') || info === document.activeElement) return;
+  info.classList.remove('show');
+}
+['mouseover', 'focusin'].forEach(type => document.addEventListener(type, e => {
+  const info = e.target.closest?.('.info');
+  if (info) showTip(info);
+}));
+document.addEventListener('mouseout', e => {
+  const info = e.target.closest?.('.info');
+  if (info && !info.contains(e.relatedTarget)) hideTip(info);
+});
+document.addEventListener('focusout', e => {
+  const info = e.target.closest?.('.info');
+  if (info) setTimeout(() => hideTip(info));
+});
 
 // ---- キー操作 ----
 document.addEventListener('keydown', e => {
