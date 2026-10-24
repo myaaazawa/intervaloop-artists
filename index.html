@@ -396,7 +396,9 @@
   .toast .undo-btn { font: inherit; font-weight: 600; color: inherit; background: none; border: none;
                      padding: 4px 2px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
   .ui-dialog .modal-box { max-width: 400px; }
-  .ui-dialog .ui-msg { font-size: 14px; line-height: 1.6; }
+  .ui-dialog .ui-title { font-size: 15px; font-weight: 700; }
+  .ui-dialog .ui-msg { font-size: 14px; line-height: 1.6; white-space: pre-line; }
+  .ui-dialog .ui-note { font-size: 12.5px; line-height: 1.6; color: var(--sub); }
   .ui-dialog .ui-input { font: inherit; font-size: 15px; padding: 6px 10px; border: 1px solid var(--line);
                          border-radius: 8px; background: var(--bg); color: var(--text); }
   .ui-dialog .ui-btns { display: flex; justify-content: flex-end; gap: 8px; }
@@ -772,9 +774,17 @@ const I18N = {
     zoomInTip: '拡大（＋ / マウスホイール）', zoomOutTip: '縮小（－ / マウスホイール）',
     fit: '全体', fitTip: '全体を表示（0）', fullscreen: '全画面', fullscreenTip: '全画面表示（F）',
     backup: 'データの書き出し・読み込み',
-    backupHint: '画像・セット・メニュー・設定を1つのファイルにまとめて保存します。別のブラウザやPCで読み込めます。',
+    backupHint: '画像・セット・練習メニュー・設定を1つのファイルにまとめて保存します。保存したデータは別のブラウザやPCで読み込めます。読み込むと、今のデータは置き換わります。',
+    exportTitle: '次の内容を書き出します',
+    exportAsk: '画像 {n} 枚（ファイルの画像 {f} 枚・URL の画像 {u} 件）、セット {s} 個、練習メニュー {m} 個、設定\nファイルの大きさ：約 {size}',
+    exportUrlNote: 'URL で追加した画像は、URL だけを保存します（画像そのものは入りません）。',
+    exportYes: '書き出す',
+    importTitle: '今のデータは、すべて置き換わります',
+    importYes: '置き換える',
+    importDate: '（{d} に書き出し）',
     exportBtn: '書き出す（バックアップ）', importBtn: '読み込む', exporting: '書き出し中…', importing: '読み込み中…',
-    importAsk: 'バックアップの内容（画像 {n} 枚）で、今の画像と設定を置き換えますか？',
+    importAsk: '今の画像 {cur} 枚・セット・練習メニュー・設定が消えて、選んだバックアップの内容になります。この操作は元に戻せません。\n必要なら、先に今のデータを書き出しておいてください。\n\n読み込むバックアップ：画像 {n} 枚{date}',
+    importNote: '人から受け取ったファイルは、信頼できる場合だけ読み込んでください。',
     importBad: 'このファイルは読み込めません。IntervaLoop for Artists のバックアップファイルを選んでください。',
     credit: 'Made by みゃ～ざわ',
     keysLink: 'キー操作 ?', keysTitle: 'キー操作', close: '閉じる',
@@ -868,9 +878,17 @@ const I18N = {
     zoomInTip: 'Zoom in (+ / mouse wheel)', zoomOutTip: 'Zoom out (- / mouse wheel)',
     fit: 'Fit', fitTip: 'Fit to window (0)', fullscreen: 'Full screen', fullscreenTip: 'Full screen (F)',
     backup: 'Export / import data',
-    backupHint: 'Save your images, sets, menus and settings into one file. You can load it in another browser or PC.',
+    backupHint: 'Save your images, sets, practice menus and settings into one file. You can load the saved data in another browser or PC. Importing replaces your current data.',
+    exportTitle: 'The following will be exported',
+    exportAsk: '{n} images ({f} image files, {u} URLs), {s} sets, {m} practice menus, and settings\nFile size: about {size}',
+    exportUrlNote: 'For images added by URL, only the URL is saved (not the image itself).',
+    exportYes: 'Export',
+    importTitle: 'All current data will be replaced',
+    importYes: 'Replace',
+    importDate: ' (exported on {d})',
     exportBtn: 'Export (backup)', importBtn: 'Import', exporting: 'Exporting…', importing: 'Importing…',
-    importAsk: 'Replace your current images and settings with this backup ({n} images)?',
+    importAsk: 'Your current {cur} images, sets, practice menus and settings will be removed and replaced with the backup. This cannot be undone.\nIf needed, export your current data first.\n\nBackup to import: {n} images{date}',
+    importNote: 'Only import files from people you trust.',
     importBad: "This file can't be loaded. Please choose an IntervaLoop for Artists backup file.",
     credit: 'Made by Myaaazawa',
     keysLink: 'Shortcuts ?', keysTitle: 'Keyboard shortcuts', close: 'Close',
@@ -1147,15 +1165,26 @@ function toast(msg, ms = 4000) {
   setTimeout(() => el.remove(), ms);
 }
 // 確認（input なし）は true / false、名前の入力（input に初期値）は 文字列 / null を返す
-function uiDialog(msg, { input = null, okText = t('ok'), danger = false } = {}) {
+function uiDialog(msg, { input = null, okText = t('ok'), danger = false, title = '', note = '' } = {}) {
   return new Promise(resolve => {
     const wrap = document.createElement('div');
     wrap.className = 'modal ui-dialog';
     const box = document.createElement('div');
     box.className = 'modal-box'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true');
+    if (title) {
+      const h = document.createElement('div');
+      h.className = 'ui-title'; h.textContent = title;
+      box.append(h);
+    }
     const p = document.createElement('div');
     p.className = 'ui-msg'; p.textContent = msg;
     box.append(p);
+    // 補足の注意は、少し間をあけて小さめ・薄い色で出す
+    if (note) {
+      const n = document.createElement('div');
+      n.className = 'ui-note'; n.textContent = note;
+      box.append(n);
+    }
     let inp = null;
     if (input !== null) {
       inp = document.createElement('input');
@@ -1204,7 +1233,7 @@ function askDelete(chip, name, onYes) {
   const timer = setTimeout(() => renderFavs(), 6000);
   yes.onclick = () => { clearTimeout(timer); onYes(); };
   no.onclick = () => { clearTimeout(timer); renderFavs(); };
-  ask.append(msg, yes, no);
+  ask.append(msg, no, yes);
   chip.replaceWith(ask);
   no.focus();
 }
@@ -1843,7 +1872,19 @@ document.addEventListener('paste', e => {
 const blobToDataUrl = blob => new Promise((res, rej) => {
   const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(blob);
 });
+// ファイルの大きさの目安（画像のデータは文字にすると約 4/3 倍になる）
+function backupSizeText() {
+  let bytes = 2000 + JSON.stringify(settings).length;
+  for (const im of images) bytes += 300 + (im.rec.blob ? Math.ceil(im.rec.blob.size * 4 / 3) : (im.url || '').length);
+  const mb = bytes / 1048576;
+  if (mb < 1) return Math.max(1, Math.round(bytes / 1024)) + ' KB';
+  return (mb < 10 ? mb.toFixed(1) : Math.round(mb)) + ' MB';
+}
 async function exportBackup() {
+  const files = images.filter(im => im.rec.blob).length, urls = images.length - files;
+  let msg = t('exportAsk', { n: images.length, f: files, u: urls, s: settings.sets.length, m: settings.favorites.length, size: backupSizeText() });
+  if (urls) msg += '\n' + t('exportUrlNote');
+  if (!await uiDialog(msg, { title: t('exportTitle'), okText: t('exportYes') })) return;
   const btn = $('exportBtn');
   btn.disabled = true; btn.textContent = t('exporting');
   try {
@@ -1857,7 +1898,8 @@ async function exportBackup() {
     const data = { app: 'IntervaLoop for Artists', format: 1, exportedAt: new Date().toISOString(), settings: rest, images: list };
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: 'application/json' }));
-    a.download = `intervaloop-artists-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    const d = new Date();   // ファイル名の日付は、その地域の日付にする（確認に出る日付と揃える）
+    a.download = `intervaloop-artists-backup-${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}.json`;
     document.body.append(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 10000);
   } finally {
@@ -1923,7 +1965,10 @@ async function importBackup(file) {
   if (!data || data.app !== 'IntervaLoop for Artists' || !Array.isArray(data.images) || typeof data.settings !== 'object') {
     toast(t('importBad'), 6000); return;
   }
-  if (!await uiDialog(t('importAsk', { n: data.images.length }))) return;
+  const when = isStr(data.exportedAt) && /^\d{4}-\d{2}-\d{2}/.test(data.exportedAt) ? new Date(data.exportedAt) : null;
+  const date = when && !isNaN(when) ? t('importDate', { d: `${when.getFullYear()}-${String(when.getMonth() + 1).padStart(2, '0')}-${String(when.getDate()).padStart(2, '0')}` }) : '';
+  const ask = t('importAsk', { cur: images.length, n: Math.min(data.images.length, MAX_IMAGES), date });
+  if (!await uiDialog(ask, { title: t('importTitle'), note: t('importNote'), okText: t('importYes'), danger: true })) return;
   const btn = $('importBtn');
   btn.disabled = true; btn.textContent = t('importing');
   const list = data.images.slice(0, MAX_IMAGES);
