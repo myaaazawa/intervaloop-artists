@@ -392,6 +392,9 @@
            width: max-content; max-width: calc(100vw - 32px); padding: 10px 16px; border-radius: 10px;
            background: var(--btn); color: var(--btn-text); font-size: 13px; line-height: 1.5; white-space: pre-line;
            box-shadow: 0 4px 14px rgba(0,0,0,.3); }
+  .toast.undo-toast { display: flex; align-items: center; gap: 14px; }
+  .toast .undo-btn { font: inherit; font-weight: 600; color: inherit; background: none; border: none;
+                     padding: 4px 2px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
   .ui-dialog .modal-box { max-width: 400px; }
   .ui-dialog .ui-msg { font-size: 14px; line-height: 1.6; }
   .ui-dialog .ui-input { font: inherit; font-size: 15px; padding: 6px 10px; border: 1px solid var(--line);
@@ -741,7 +744,7 @@ const I18N = {
     addFolder: 'フォルダーから追加', addFiles: '画像を選んで追加',
     urlPh: '画像のURLを貼り付け', urlAdd: 'URLを追加', urlBad: '画像のURL（http〜）を入力してください。',
     shuffle: 'シャッフル', shuffleTip: 'このセットの画像の並びをランダムに入れ替える',
-    clearAll: '画像をすべて削除', clearAsk: 'このセットの画像をすべて削除しますか？（元の画像ファイルは消えません）',
+    clearAll: '画像をすべて削除', clearAsk: 'このセットの画像をすべて削除しますか？　パソコンに保存してある元の画像ファイルは消えませんが、URL や貼り付けで追加した画像は、アプリから見られなくなります。',
     starOnly: '★だけで練習', starOnlyTip: '★をつけた画像だけを練習に使う',
     imgCount: '画像 {n} / {max} 枚',
     imgFull: 'これ以上登録できません（上限 {max} 枚）',
@@ -754,7 +757,8 @@ const I18N = {
     prevImgTip: '前の画像（[）。時間はそのまま', nextImgTip: '次の画像（]）。時間はそのまま',
     defaultSet: 'セット1', newSet: '＋ 新しいセット', newSetName: 'セット{n}', setName: 'セットの名前',
     renameSet: '名前を変更', deleteSet: 'セットを削除',
-    deleteSetAsk: '「{name}」と、その中の画像 {n} 枚を削除しますか？（元の画像ファイルは消えません）',
+    undoDeleted: '画像を削除しました', undoDeletedN: '画像を削除しました（{n}枚）', undo: '元に戻す',
+    deleteSetAsk: '「{name}」と、その中の画像 {n} 枚を削除しますか？　パソコンに保存してある元の画像ファイルは消えませんが、URL や貼り付けで追加した画像は、アプリから見られなくなります。',
     lastSet: 'セットが1つだけのときは削除できません。', setTabTip: 'サムネイルをここにドラッグすると、このセットに移動します',
     stripClose: '▾ 画像の一覧を閉じる', stripOpen: '▸ 画像の一覧を開く', stripTip: '画像の一覧を開く／閉じる（L）',
     stripResizeTip: 'ドラッグで画像の一覧の高さを変える（ダブルクリックで元に戻す）',
@@ -836,7 +840,7 @@ const I18N = {
     addFolder: 'Add a folder', addFiles: 'Add images',
     urlPh: 'Paste an image URL', urlAdd: 'Add URL', urlBad: 'Please enter an image URL (http...).',
     shuffle: 'Shuffle', shuffleTip: 'Put the images in this set in random order',
-    clearAll: 'Remove all images', clearAsk: 'Remove all images in this set? (Your original files are not deleted.)',
+    clearAll: 'Remove all images', clearAsk: 'Remove all images in this set? Original image files saved on your computer are not deleted, but images added by URL or by pasting will no longer be available in the app.',
     starOnly: '★ only', starOnlyTip: 'Practice with starred images only',
     imgCount: '{n} / {max} images',
     imgFull: "You can't add any more images (limit: {max}).",
@@ -849,7 +853,8 @@ const I18N = {
     prevImgTip: 'Previous image ([). The time keeps going', nextImgTip: 'Next image (]). The time keeps going',
     defaultSet: 'Set 1', newSet: '+ New set', newSetName: 'Set {n}', setName: 'Name for this set',
     renameSet: 'Rename', deleteSet: 'Delete set',
-    deleteSetAsk: 'Delete "{name}" and its {n} images? (Your original files are not deleted.)',
+    undoDeleted: 'Image removed', undoDeletedN: 'Images removed ({n})', undo: 'Undo',
+    deleteSetAsk: 'Delete "{name}" and its {n} images? Original image files saved on your computer are not deleted, but images added by URL or by pasting will no longer be available in the app.',
     lastSet: "You can't delete the only set.", setTabTip: 'Drag a thumbnail here to move it to this set',
     stripClose: '▾ Hide image list', stripOpen: '▸ Show image list', stripTip: 'Show / hide the image list (L)',
     stripResizeTip: 'Drag to change the height of the image list (double-click to reset)',
@@ -1131,7 +1136,10 @@ function openFavForm(add, def, onSave) {
 // ---- ページの中のお知らせ・確認・名前の入力 ----
 // ブラウザのダイアログ（alert / confirm / prompt）は、開いているあいだページの動きを止めて
 // 計測中のタイマーも止まってしまうため、代わりにページの中で表示する
+const UNDO_MS = 8000;           // 1枚ずつ消した画像を「元に戻す」で戻せる時間
+let undoStack = [], undoTimer = null;
 function toast(msg, ms = 4000) {
+  clearUndo();
   document.querySelector('.toast')?.remove();
   const el = document.createElement('div');
   el.className = 'toast'; el.setAttribute('role', 'status'); el.textContent = msg;
@@ -1499,11 +1507,58 @@ function addUrls(urls) {
 async function removeImage(id) {
   const i = images.findIndex(im => im.id === id);
   if (i < 0) return;
-  if (curId === id) { const n = stepImage(1, false); curId = n && n.id !== id ? n.id : null; }
+  const wasCurrent = curId === id;
+  if (wasCurrent) { const n = stepImage(1, false); curId = n && n.id !== id ? n.id : null; }
   const [im] = images.splice(i, 1);
   revokeItem(im);
   try { await idb.del(im.id); } catch (e) {}
   saveOrder(); renderSets(); renderStrip(); showImage(curId);
+  // 8秒間は「元に戻す」で戻せるように、消した画像を覚えておく（新しい順に1枚ずつ戻す）
+  undoStack.push({ rec: im.rec, index: i, prevId: images[i - 1]?.id ?? null, wasCurrent: wasCurrent });
+  showUndo();
+}
+
+// ---- 1枚ずつ消した画像を「元に戻す」 ----
+// 最後の操作から8秒たつか、ほかのお知らせが出ると、それまでに消した画像は戻せなくなる
+// （画像はすぐに保存先から消しているので、ページを閉じた場合もそのまま削除になる）
+function clearUndo() {
+  undoStack = [];
+  clearTimeout(undoTimer); undoTimer = null;
+  document.querySelector('.undo-toast')?.remove();
+}
+function showUndo() {
+  clearTimeout(undoTimer);
+  if (!undoStack.length) { clearUndo(); return; }
+  let el = document.querySelector('.undo-toast');
+  if (!el) {
+    document.querySelector('.toast')?.remove();
+    el = document.createElement('div');
+    el.className = 'toast undo-toast'; el.setAttribute('role', 'status');
+    const msg = document.createElement('span'); msg.className = 'undo-msg';
+    const btn = document.createElement('button'); btn.className = 'undo-btn'; btn.type = 'button';
+    btn.onclick = undoRemove;
+    el.append(msg, btn);
+    document.body.append(el);
+  }
+  const n = undoStack.length;
+  el.querySelector('.undo-msg').textContent = n > 1 ? t('undoDeletedN', { n }) : t('undoDeleted');
+  el.querySelector('.undo-btn').textContent = t('undo');
+  undoTimer = setTimeout(clearUndo, UNDO_MS);
+}
+async function undoRemove() {
+  const u = undoStack.pop();
+  if (!u) return;
+  const rec = u.rec;
+  // 消したあとでセットが削除されていたら、いま開いているセットに戻す
+  if (!settings.sets.some(st => st.id === rec.setId)) rec.setId = settings.curSet;
+  // 元の位置：消したときに前にあった画像のすぐ後ろ（見つからなければ同じ番号の位置）
+  let at = u.prevId ? images.findIndex(im => im.id === u.prevId) + 1 : 0;
+  if (u.prevId && at === 0) at = Math.min(u.index, images.length);
+  images.splice(at, 0, makeItem(rec));
+  try { await idb.put(rec); } catch (e) {}
+  saveOrder(); renderSets(); renderStrip();
+  if ((u.wasCurrent || !curItem()) && rec.setId === settings.curSet) showImage(rec.id);
+  showUndo();
 }
 function toggleFlag(im, key) {
   im[key] = im.rec[key] = !im[key];
