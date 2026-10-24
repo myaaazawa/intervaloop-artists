@@ -1,4 +1,9 @@
-# IntervaLoop for Artists
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="logo/IntervaLoop_logo_dark_artists.png">
+    <img src="logo/IntervaLoop_logo_light_artists.png" alt="IntervaLoop for Artists" width="360">
+  </picture>
+</p>
 
 [日本語](#日本語) | [English](#english)
 
@@ -11,6 +16,19 @@
 ブラウザで使え、インストールや登録は必要ありません。
 
 **アプリを開く：** https://myaaazawa.github.io/intervaloop-artists/
+
+### 画面
+
+<img src="screenshots/artists-pc-dark.png" alt="パソコンの画面（ダーク）。彫刻の画像を表示して練習している様子" width="720">
+
+画面に映っている彫刻の写真は、シカゴ美術館（Art Institute of Chicago）所蔵のパブリックドメイン作品です（CC0）。
+
+- オーギュスト・ロダン《カレーの市民（ジャン・デール）》1889年
+- ハリエット・ホズマー《パルミラの女王ゼノビア》1859年以降
+- レアンドロ・ガリアルディ《聖ペテロ》1765〜66年
+- ジャン＝アントワーヌ・ウードン《ドマンジュヴィル夫人の胸像》1780年
+- 古代ローマ《女性の肖像胸像》2世紀中ごろ
+- 古代ローマ《ハドリアヌス帝の頭部》130〜138年
 
 ### 主な機能
 
@@ -108,6 +126,19 @@ Load your reference images, and they change automatically after each pose.
 It runs in your browser. No installation or sign-up needed.
 
 **Open the app:** https://myaaazawa.github.io/intervaloop-artists/
+
+### Screenshot
+
+<img src="screenshots/artists-pc-dark.png" alt="Computer screen (dark), practicing with sculpture images" width="720">
+
+The sculpture photos in the screenshot are public-domain works from the Art Institute of Chicago (CC0).
+
+- Auguste Rodin, *A Burgher of Calais (Jean d'Aire)*, 1889
+- Harriet Hosmer, *Zenobia, Queen of Palmyra*, after 1859
+- Leandro Gagliardi, *Saint Peter*, 1765–66
+- Jean Antoine Houdon, *Bust of Anne-Marie-Louise Thomas de Domangeville de Sérilly, Comtesse de Pange*, 1780
+- Ancient Roman, *Portrait Bust of a Woman*, mid–2nd century
+- Ancient Roman, *Portrait Head of Emperor Hadrian*, 130–138
 
 ### Features
 
