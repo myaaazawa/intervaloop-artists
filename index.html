@@ -248,6 +248,11 @@
     font-variant-numeric: tabular-nums;
   }
   .hms span { font-size: 11px; color: var(--sub); margin-right: 2px; }
+  /* 念のため：項目名が長くて入りきらないときは、数字の欄ではなく項目名の文字を「…」で詰める
+     （iPhone の日本語の文字は幅が広く、数字の欄が枠からはみ出すことがあるため） */
+  .row > .label { min-width: 0; }
+  .row > .label > [data-i18n] { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .row > .label > .dot, .row > .label > .info, .row > .hms { flex: 0 0 auto; }
   .steps { display: flex; flex-direction: column; gap: 6px; }
   .step { display: flex; align-items: center; gap: 4px; }
   .step .hms input, .step .num { width: 36px; }
