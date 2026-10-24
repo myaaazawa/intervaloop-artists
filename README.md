@@ -24,7 +24,7 @@
 - メニューの保存（9件まで）、データの書き出し・読み込み（バックアップ）
 - 時間送り・巻き戻し、先頭へ、スキップ、丸いバーの操作のロック
 - 8種類の音と音量、残り数秒の合図、色・背景（自動／ライト／ダーク）、日本語・英語、全画面表示
-- パソコン・スマートフォン・タブレットに対応
+- 対応端末：パソコン・タブレット（スマートフォンは画面が小さいため、おすすめしません）
 
 ### 使い方
 
@@ -62,7 +62,7 @@
 ### 画像の権利について（必ずお読みください）
 
 - 参考画像の著作権・肖像権は、撮影した人や写っている人にあります。
-- このアプリで使う画像は、ご自身で撮影したもの、または資料としての利用が許可されているものにしてください。
+- このアプリで使う画像は、ご自身で撮影したもの、または資料としての利用が許可されているものを推奨します。
 - 他の人が権利を持つ画像が写った画面を、SNSなどで公開しないでください。
 - 描いた絵を公開する場合は、資料としての利用や公開が許可されている画像だけを使ってください。
 - 画像の利用によって生じた問題について、作者は責任を負いません。画像の権利の確認は、利用する方ご自身で行ってください。
@@ -121,7 +121,7 @@ It runs in your browser. No installation or sign-up needed.
 - Save up to 9 menus, and export / import all your data as a backup
 - Back / forward, restart, skip, and a lock for the ring
 - 8 sound types and volume, a soft beep in the last few seconds, custom colors, background (Auto / Light / Dark), Japanese and English, full screen
-- Works on computers, smartphones and tablets
+- Supported devices: computers and tablets (smartphones are not recommended because of the small screen)
 
 ### How to use
 
@@ -159,7 +159,7 @@ Shortcuts work only while this app's tab is selected.
 ### About image rights (please read)
 
 - The copyright and portrait rights of reference images belong to the photographer and the people in them.
-- Use only images you took yourself, or images that are licensed for use as reference material.
+- We recommend using images you took yourself, or images that are licensed for use as reference material.
 - Do not share screenshots that show images owned by others, on social media or elsewhere.
 - If you publish your drawings, use only images that allow reference use and publication.
 - The author is not responsible for any problems arising from the images you use. Please check the rights of each image yourself.
