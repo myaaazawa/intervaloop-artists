@@ -2,6 +2,8 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
+<!-- 安全設定：外部のプログラムやスタイルは読み込まない。画像だけは、URLで追加できるよう外部も許可する -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src * data: blob:; media-src data: blob:; connect-src data: blob:; font-src data:; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>IntervaLoop for Artists</title>
 <link rel="icon" id="favicon" type="image/svg+xml" href="data:,">
@@ -731,6 +733,7 @@ const I18N = {
     imgCount: '画像 {n} / {max} 枚',
     imgFull: 'これ以上登録できません（上限 {max} 枚）',
     imgPartial: '上限 {max} 枚のため、{n} 枚だけ追加しました。',
+    importRejected: '読み込めない形式の画像が {n} 件あったため、読み込みませんでした。',
     saveFail: '{n} 枚の画像を保存できませんでした。ブラウザの保存容量が足りない可能性があります。今は表示されていますが、次に開いたときには消えています。',
     noImages: 'このセットには、まだ画像がありません。', imgBad: '読み込めません',
     imgDel: '削除', starTip: '★をつける／外す', skipImgTip: '練習で使わない／使う',
@@ -825,6 +828,7 @@ const I18N = {
     imgCount: '{n} / {max} images',
     imgFull: "You can't add any more images (limit: {max}).",
     imgPartial: 'Only {n} images were added because the limit is {max}.',
+    importRejected: "Skipped {n} images in an unsupported format.",
     saveFail: "Couldn't save {n} images. The browser may be out of storage space. They are shown now but will be gone next time you open the app.",
     noImages: 'No images in this set yet.', imgBad: "Can't load",
     imgDel: 'Remove', starTip: 'Star / unstar', skipImgTip: "Don't use / use in practice",
@@ -878,7 +882,7 @@ const I18N = {
   },
 };
 let lang = settings.lang || ((navigator.language || '').toLowerCase().startsWith('ja') ? 'ja' : 'en');
-if (!I18N[lang]) lang = 'en';
+if (!Object.hasOwn(I18N, lang)) lang = 'en';   // 表にない言語（変な値を含む）は英語にする
 const t = (key, params = {}) =>
   String(I18N[lang][key] ?? I18N.en[key] ?? key).replace(/\{(\w+)\}/g, (_, k) => params[k]);
 
@@ -1792,6 +1796,59 @@ async function exportBackup() {
     btn.disabled = false; btn.textContent = t('exportBtn');
   }
 }
+// ---- バックアップの中身の確認 ----
+// 他の人から受け取ったファイルを読み込むこともあるので、正しい形の値だけを受け取る。
+// 形がおかしい値や、知らない項目は捨てる（初期値のまま）
+const isStr = v => typeof v === 'string';
+const intIn = (v, min, max) => Number.isInteger(v) && v >= min && v <= max;
+const okId = v => isStr(v) && /^[\w-]{1,64}$/.test(v);
+const okColor = v => isStr(v) && /^#[0-9a-f]{6}$/i.test(v);
+const okName = v => isStr(v) ? [...v].slice(0, 20).join('') : '';
+// 画像のデータは「画像の data: URL」だけ（外部のURLを読み込ませないため）
+const okImageData = v => isStr(v) && /^data:image\/(png|jpe?g|gif|webp|bmp|avif|svg\+xml);base64,[A-Za-z0-9+/=]+$/i.test(v);
+// URLで追加した画像は http:// か https:// だけ
+const okImageUrl = v => isStr(v) && v.length <= 2048 && /^https?:\/\/[^\s"'<>]+$/i.test(v);
+const okSteps = v => Array.isArray(v) && v.length >= 1 && v.length <= 20 &&
+  v.every(st => st && intIn(st.work, 1, 359999) && intIn(st.count, 1, 999));
+function cleanImportedSettings(s) {
+  const out = {};
+  if (!s || typeof s !== 'object') return out;
+  if (okSteps(s.steps)) out.steps = s.steps.map(st => ({ work: st.work, count: st.count }));
+  const ints = { rest: [0, 359999], countdown: [0, 10], warnSec: [1, 30], volume: [0, 100], stripH: [40, 2000], seekAmount: [1, 999] };
+  for (const [k, [min, max]] of Object.entries(ints)) if (intIn(s[k], min, max)) out[k] = s[k];
+  for (const k of ['ringLock', 'se', 'warnSound', 'toolbarOpen', 'starOnly', 'stripOpen']) if (typeof s[k] === 'boolean') out[k] = s[k];
+  if (isStr(s.sound) && Object.hasOwn(SOUNDS, s.sound)) out.sound = s.sound;
+  if (['auto', 'light', 'dark'].includes(s.theme)) out.theme = s.theme;
+  if (isStr(s.lang) && Object.hasOwn(I18N, s.lang)) out.lang = s.lang;
+  if (['1', '60', '3600'].includes(s.seekUnit)) out.seekUnit = s.seekUnit;
+  if (s.colors && typeof s.colors === 'object') {
+    out.colors = { ...defaultColors };
+    for (const k of Object.keys(defaultColors)) if (okColor(s.colors[k])) out.colors[k] = s.colors[k];
+  }
+  if (s.view && typeof s.view === 'object') {
+    const v = s.view;
+    out.view = {
+      flip: v.flip === true, bw: v.bw === true, contrast: v.contrast === true,
+      grid: intIn(v.grid, 0, 10) ? v.grid : 0,
+      tone: ['none', 'sil', 'three'].includes(v.tone) ? v.tone : 'none',
+    };
+  }
+  if (Array.isArray(s.favorites)) {
+    out.favorites = s.favorites.filter(f => f && okSteps(f.steps)).slice(0, MAX_FAVS).map(f => ({
+      name: okName(f.name) || 'menu', steps: f.steps.map(st => ({ work: st.work, count: st.count })),
+      rest: intIn(f.rest, 0, 359999) ? f.rest : 0,
+    }));
+  }
+  if (Array.isArray(s.sets)) {
+    const sets = s.sets.filter(x => x && okId(x.id)).slice(0, 50).map(x => ({ id: x.id, name: okName(x.name) || 'Set' }));
+    if (sets.length) {
+      out.sets = sets;
+      if (sets.some(x => x.id === s.curSet)) out.curSet = s.curSet;
+    }
+  }
+  return out;
+}
+
 async function importBackup(file) {
   let data = null;
   try { data = JSON.parse(await file.text()); } catch (e) {}
@@ -1803,21 +1860,26 @@ async function importBackup(file) {
   btn.disabled = true; btn.textContent = t('importing');
   const list = data.images.slice(0, MAX_IMAGES);
   const ids = [];
-  let failed = 0;
+  let failed = 0, rejected = 0;
   try { await idb.clear(); } catch (e) {}
   for (const e of list) {
-    const rec = { id: e.id || newId(), name: e.name || '', setId: e.setId, star: !!e.star, skip: !!e.skip };
-    if (e.data) {
+    if (!e || typeof e !== 'object') continue;
+    const rec = { id: okId(e.id) ? e.id : newId(), name: isStr(e.name) ? e.name.slice(0, 200) : '',
+                  setId: okId(e.setId) ? e.setId : undefined, star: e.star === true, skip: e.skip === true };
+    if (okImageData(e.data)) {
       try { rec.blob = await (await fetch(e.data)).blob(); } catch (err) { failed++; continue; }
       rec.thumb = await makeThumb(rec.blob);
-    } else if (e.url) rec.url = e.url;
-    else continue;
+    } else if (okImageUrl(e.url)) rec.url = e.url;
+    else { rejected++; continue; }               // 形がおかしい画像は読み込まない
     try { await idb.put(rec); ids.push(rec.id); } catch (err) { failed++; }
   }
-  settings = { ...defaults, ...data.settings, imageOrder: ids };
+  settings = { ...defaults, ...cleanImportedSettings(data.settings), imageOrder: ids };
   save();
   // 読み込み直したあとに表示する（ページを読み込み直すと、お知らせが消えてしまうため）
-  if (failed) { try { sessionStorage.setItem(NOTICE_KEY, t('saveFail', { n: failed })); } catch (e) {} }
+  const notes = [];
+  if (rejected) notes.push(t('importRejected', { n: rejected }));
+  if (failed) notes.push(t('saveFail', { n: failed }));
+  if (notes.length) { try { sessionStorage.setItem(NOTICE_KEY, notes.join('\n')); } catch (e) {} }
   location.reload();    // 読み込んだ設定で、最初から表示し直す
 }
 const NOTICE_KEY = 'intervaLoopArtistsNotice';
