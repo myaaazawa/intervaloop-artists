@@ -84,6 +84,8 @@
   .overlay { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center;
              justify-content: center; gap: 8px; background: rgba(0,0,0,.55); color: #fff; pointer-events: none; }
   .overlay.on { display: flex; }
+  /* チェンジ中に次の画像を見せるときは、幕を薄くして画像が見えるようにする */
+  .overlay.light { background: rgba(0,0,0,.25); text-shadow: 0 1px 6px rgba(0,0,0,.6); }
   .overlay .ov-title { font-size: 28px; font-weight: 600; }
   .overlay .ov-time { font-size: 56px; font-weight: 300; font-variant-numeric: tabular-nums; }
   .overlay .ov-count { font-size: 120px; font-weight: 300; line-height: 1; font-variant-numeric: tabular-nums; }
@@ -314,10 +316,13 @@
   .info.open-right .tip { transform: translateX(-15%); }
   .info.open-right .tip::after { left: calc(15% - var(--dx, 0px)); }
   .label .info { margin-left: 2px; }
-  .volume select {
+  .volume select, #restShow {
     font: inherit; font-size: 13px; color: var(--text); background: var(--panel);
     border: 1px solid var(--line); border-radius: 6px; padding: 2px 4px; cursor: pointer;
   }
+  /* チェンジ中の画像（チェンジの行の補足なので、少し字下げして小さめに） */
+  .rest-show-row { padding-left: 14px; font-size: 13px; color: var(--sub); }
+  .rest-show-row.off { opacity: .45; }
   .sound-row { margin-top: -6px; }
   .btn-sm {
     font: inherit; font-size: 13px; color: var(--text); background: var(--panel); cursor: pointer;
@@ -617,6 +622,13 @@
           <input type="number" inputmode="numeric" min="0" max="59" data-u="s"><span data-i18n="s"></span>
         </div>
       </div>
+      <div class="row rest-show-row">
+        <label class="volume" for="restShow"><span data-i18n="restShow"></span></label>
+        <select id="restShow">
+          <option value="prev" data-i18n="restShowPrev"></option>
+          <option value="next" data-i18n="restShowNext"></option>
+        </select>
+      </div>
       <div class="row">
         <div class="label"><span class="dot" style="background:var(--sub)"></span><span data-i18n="countdown"></span><span class="info" tabindex="0">i<span class="tip" role="tooltip" data-i18n="tipCountdown"></span></span></div>
         <div class="hms"><input class="num" type="number" inputmode="numeric" min="0" max="10" id="countdown"><span data-i18n="s"></span></div>
@@ -720,7 +732,7 @@ const defaultColors = { work: '#6c7cff', rest: '#f2b84b', done: '#4fd1a5' };
 const oldDefaultColors = { work: '#ff7a45', rest: '#3aa5ff', done: '#34c07a' };   // 前の版の初期色
 const defaultSteps = [{ work: 30, count: 10 }, { work: 60, count: 5 }, { work: 120, count: 3 }, { work: 300, count: 2 }];
 const defaults = {
-  steps: defaultSteps, rest: 5, countdown: 3, ringLock: true, se: true, volume: 70, sound: 'simple', warnSound: true, warnSec: 5, toolbarOpen: true, stripH: 104,
+  steps: defaultSteps, rest: 5, restShow: 'prev', countdown: 3, ringLock: true, se: true, volume: 70, sound: 'simple', warnSound: true, warnSec: 5, toolbarOpen: true, stripH: 104,
   colors: { ...defaultColors }, favorites: null, imageOrder: [], sets: null, curSet: null, starOnly: false,
   view: { flip: false, bw: false, contrast: false, grid: 0, tone: 'none' },
 };
@@ -760,7 +772,8 @@ const I18N = {
     favFull: 'これ以上登録できません',
     ready: '準備OK', getReady: 'まもなく開始', phaseWork: 'ポーズ', phaseRest: 'チェンジ', paused: '（一時停止）', done: '終了！',
     roundOf: '{n} / {total} ポーズ', poseLen: '{time}', nextLen: '次は {time}',
-    nextImage: '次は {n} 枚目の画像', doneSub: '{n} ポーズ描きました。おつかれさまでした！',
+    nextImage: '次は {n} 枚目の画像', nextPose: '次のポーズは {n} 枚目の画像',
+    restShow: 'チェンジ中の画像', restShowPrev: '前の画像', restShowNext: '次の画像', doneSub: '{n} ポーズ描きました。おつかれさまでした！',
     reviewHint: '描いた画像をクリックすると、大きく表示できます。', reviewOpen: '▦ 振り返りを見る',
     needWork: 'ポーズ時間を1秒以上、回数を1回以上にしてください。',
     soundPanel: '音の設定',
@@ -865,7 +878,8 @@ const I18N = {
     favFull: "You can't add any more menus.",
     ready: 'Ready', getReady: 'Get ready', phaseWork: 'Pose', phaseRest: 'Change', paused: ' (paused)', done: 'Done!',
     roundOf: 'Pose {n} / {total}', poseLen: '{time}', nextLen: 'Next: {time}',
-    nextImage: 'Next: image {n}', doneSub: 'You drew {n} poses. Great work!',
+    nextImage: 'Next: image {n}', nextPose: 'Next pose: image {n}',
+    restShow: 'Image during change', restShowPrev: 'Previous image', restShowNext: 'Next image', doneSub: 'You drew {n} poses. Great work!',
     reviewHint: 'Click an image to see it large.', reviewOpen: '▦ Review',
     needWork: 'Set each pose time to at least 1 second and each count to at least 1.',
     soundPanel: 'Sound',
@@ -1015,6 +1029,7 @@ function renderSteps() {
     box.append(row);
   });
   setHms(restBox(), settings.rest);
+  $('restShow').value = settings.restShow === 'next' ? 'next' : 'prev';
   $('countdown').value = settings.countdown;
   showTotal();
 }
@@ -1031,6 +1046,9 @@ function readSteps() {
 const works = () => settings.steps.flatMap(st => Array(st.count).fill(st.work)).filter(w => w > 0);
 // 合計時間（チェンジは最後のポーズの後には入らない）。開始前のカウントダウンも足す
 function showTotal() {
+  // チェンジが 0 秒のときは、チェンジ中の画像は関係ないので選べなくする
+  $('restShow').disabled = settings.rest <= 0;
+  $('restShow').closest('.row').classList.toggle('off', settings.rest <= 0);
   const w = works();
   const countdown = w.length ? settings.countdown : 0;
   const sec = countdown + w.reduce((a, b) => a + b, 0) + settings.rest * Math.max(0, w.length - 1);
@@ -1043,6 +1061,7 @@ $('addStep').onclick = () => {
   save(); renderSteps(); render();
 };
 $('menuSet').addEventListener('input', () => { readSteps(); if (state === 'idle') render(); });
+$('restShow').addEventListener('change', () => { settings.restShow = $('restShow').value; save(); });
 
 // ---- 音の設定 ----
 function readSound() {
@@ -1963,6 +1982,7 @@ function cleanImportedSettings(s) {
   if (['auto', 'light', 'dark'].includes(s.theme)) out.theme = s.theme;
   if (isStr(s.lang) && Object.hasOwn(I18N, s.lang)) out.lang = s.lang;
   if (['1', '60', '3600'].includes(s.seekUnit)) out.seekUnit = s.seekUnit;
+  if (['prev', 'next'].includes(s.restShow)) out.restShow = s.restShow;
   if (s.colors && typeof s.colors === 'object') {
     out.colors = { ...defaultColors };
     for (const k of Object.keys(defaultColors)) if (okColor(s.colors[k])) out.colors[k] = s.colors[k];
@@ -2245,10 +2265,16 @@ function render() {
   if (active() && phase === 'ready') $('readyCount').textContent = Math.max(1, Math.ceil(left / 1000));
   const resting = active() && phase === 'rest';
   $('restOv').classList.toggle('on', resting);
+  $('restOv').classList.toggle('light', resting && restAdvanced);
   if (resting) {
     $('restTime').textContent = fmt(left);
-    const n = stepImage(1, true);
-    $('restSub').textContent = n ? t('nextImage', { n: setImgs().indexOf(n) + 1 }) : '';
+    if (restAdvanced) {
+      const c = curItem();   // もう次の画像を出しているので、その画像の番号を出す
+      $('restSub').textContent = c ? t('nextPose', { n: setImgs().indexOf(c) + 1 }) : '';
+    } else {
+      const n = stepImage(1, true);
+      $('restSub').textContent = n ? t('nextImage', { n: setImgs().indexOf(n) + 1 }) : '';
+    }
   }
   $('doneOv').classList.toggle('on', state === 'done' && !reviewHidden);
   viewer.classList.toggle('show-review-btn', state === 'done' && reviewHidden);
@@ -2318,6 +2344,7 @@ function updateLogo(elapsed) {
 }
 
 function beginPhase(p) {
+  if (p !== 'rest') restAdvanced = false;
   phase = p;
   phaseLen = (p === 'work' ? plan[k] : p === 'rest' ? settings.rest : settings.countdown) * 1000;
   lastBeep = null;
@@ -2326,6 +2353,9 @@ function beginPhase(p) {
 // ポーズが始まるときに、描く画像を記録する（振り返り用）
 const logPose = () => { if (curId) sessionLog.push(curId); };
 const advanceImage = () => { const n = stepImage(1, true); if (n) showImage(n.id); };
+// チェンジ中に次の画像を見せるか。見せたときは、チェンジの終わりで画像を進めないよう覚えておく
+let restAdvanced = false;
+const showNextInRest = () => (restAdvanced = settings.restShow === 'next');
 
 // 今のフェーズを終えて次へ進む。ポーズが始まるたびに次の画像へ
 function nextPhase() {
@@ -2333,10 +2363,10 @@ function nextPhase() {
     beginPhase('work'); logPose(); se('start');
   } else if (phase === 'work') {
     if (k >= plan.length - 1) { finish(); return; }
-    if (settings.rest > 0) { se('end'); beginPhase('rest'); }
+    if (settings.rest > 0) { se('end'); beginPhase('rest'); if (showNextInRest()) advanceImage(); }
     else { se('switch'); k++; advanceImage(); beginPhase('work'); logPose(); }   // チェンジなしは区切り音1回だけ
   } else {
-    k++; advanceImage(); beginPhase('work'); logPose(); se('start');
+    k++; if (!restAdvanced) advanceImage(); beginPhase('work'); logPose(); se('start');
   }
   render();
 }
