@@ -208,6 +208,34 @@
   .thumb.drop-before { box-shadow: -5px 0 0 -1px var(--rest); }
   .thumb.drop-after { box-shadow: 5px 0 0 -1px var(--rest); }
   .thumb.dragging { opacity: .4; }
+  /* 複数選択：選んだ画像は枠と ✓ で示す。選ぶモードでは、選んでいない画像に空の丸を出す */
+  .strip { user-select: none; -webkit-user-select: none; }
+  .thumb.sel { border-color: var(--rest); }
+  .thumb.sel::after, .strip.selecting .thumb::after {
+    content: ''; position: absolute; right: 3px; top: 3px; width: 22px; height: 22px; box-sizing: border-box;
+    border-radius: 50%; border: 2px solid #fff; background: rgba(0,0,0,.35); pointer-events: none; }
+  .thumb.sel::after, .strip.selecting .thumb.sel::after { content: '✓'; background: var(--rest); border-color: var(--rest); color: #fff;
+                      font-size: 13px; line-height: 18px; text-align: center; }
+  .thumb.sel .del, .strip.selecting .thumb .del { display: none !important; }
+  .strip.selecting .thumb button { pointer-events: none; }   /* 選ぶモードでは、どこを押しても選ぶだけ */
+  .sel-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 5px 10px 0; background: var(--panel); }
+  .sel-bar.hidden, .strip-wrap.closed .sel-bar { display: none; }
+  .sel-bar .sel-count { font-size: 12px; font-weight: 600; color: var(--text); margin-right: 4px; }
+  .sel-bar .ghost { font-size: 12px; padding: 3px 7px; border: 1px solid var(--line); border-radius: 999px; }
+  .sel-bar .ghost:hover { background: var(--bg); }
+  .sel-bar .ghost:disabled, .sel-bar select:disabled { opacity: .45; cursor: default; }
+  .sel-bar .danger { color: #d9534f; }
+  .sel-bar select { font: inherit; font-size: 12px; color: var(--text); background: var(--bg);
+                    border: 1px solid var(--line); border-radius: 999px; padding: 3px 6px; }
+  /* 「選択」ボタンは、セットのタブの行の右端に置く */
+  .set-row { display: flex; align-items: flex-start; gap: 6px; background: var(--panel); padding-right: 10px; }
+  .set-row .set-tabs { flex: 1; min-width: 0; }
+  .strip-wrap.closed .set-row { display: none; }
+  #selectBtn { flex: 0 0 auto; margin-top: 4px; font-size: 12px; padding: 3px 9px; border: 1px solid var(--line); border-radius: 999px; }
+  #selectBtn:hover { background: var(--bg); }
+  #selectBtn.on { background: var(--rest); border-color: var(--rest); color: #fff; }
+  .drag-count { position: fixed; left: -999px; top: 0; padding: 4px 10px; border-radius: 999px;
+                background: var(--rest); color: #fff; font-size: 13px; font-weight: 600; }
 
   /* ---- 右：タイマーと設定 ---- */
   .side { height: 100vh; overflow-y: auto; padding: 18px 16px 24px; display: flex; flex-direction: column; gap: 16px;
@@ -557,7 +585,23 @@
     <label class="star-only" data-i18n-title="starOnlyTip"><input type="checkbox" id="starOnly"><span data-i18n="starOnly"></span></label>
     <button class="ghost" id="shuffleBtn" data-i18n="shuffle" data-i18n-title="shuffleTip"></button>
   </div>
-  <div class="set-tabs" id="setTabs"></div>
+  <div class="set-row">
+    <div class="set-tabs" id="setTabs"></div>
+    <button class="ghost" id="selectBtn" data-i18n="selectMode" data-i18n-title="selectModeTip"></button>
+  </div>
+  <div class="sel-bar hidden" id="selBar">
+    <span class="sel-count" id="selCount"></span>
+    <button class="ghost" id="selFirst" data-i18n="selFirst" data-sel-need></button>
+    <button class="ghost" id="selPrev" data-i18n="selPrev" data-sel-need></button>
+    <button class="ghost" id="selNext" data-i18n="selNext" data-sel-need></button>
+    <button class="ghost" id="selLast" data-i18n="selLast" data-sel-need></button>
+    <select id="selSet" data-sel-need></select>
+    <button class="ghost" id="selStar" data-i18n="selStar" data-sel-need></button>
+    <button class="ghost" id="selSkip" data-i18n="selSkip" data-sel-need></button>
+    <button class="ghost danger" id="selDel" data-i18n="selDelete" data-sel-need></button>
+    <button class="ghost" id="selAll" data-i18n="selAll"></button>
+    <button class="ghost" id="selClear" data-i18n="selClear"></button>
+  </div>
   <div class="strip" id="strip"></div>
   </div>
   <input type="file" id="dirInput" webkitdirectory multiple hidden>
@@ -804,6 +848,12 @@ const I18N = {
     defaultSet: 'セット1', newSet: '＋ 新しいセット', newSetName: 'セット{n}', setName: 'セットの名前',
     renameSet: '名前を変更', deleteSet: 'セットを削除',
     undoDeleted: '画像を削除しました', undoDeletedN: '画像を削除しました（{n}枚）', undo: '元に戻す',
+    selectMode: '選択', selectModeTip: '画像を選んで、まとめて並べ替え・移動・削除する（PC では Ctrl／Shift＋クリックでも選べます）',
+    selDone: '選択をやめる', selCount: '{n}枚を選択中', selHint: '画像をタップして選びます',
+    selFirst: '⇤ 先頭へ', selPrev: '◀ 前へ', selNext: '後ろへ ▶', selLast: '末尾へ ⇥',
+    selMoveSet: 'セットへ移動…', selStar: '★ をつける', selUnstar: '★ を外す',
+    selSkip: '⊘ 使わない', selUnskip: '⊘ を外す', selDelete: '削除',
+    selAll: 'すべて選択', selClear: '選択を解除', dragCount: '{n}枚',
     deleteSetAsk: '「{name}」と、その中の画像 {n} 枚を削除しますか？　パソコンに保存してある元の画像ファイルは消えませんが、URL や貼り付けで追加した画像は、アプリから見られなくなります。',
     lastSet: 'セットが1つだけのときは削除できません。', setTabTip: 'サムネイルをここにドラッグすると、このセットに移動します',
     stripClose: '▾ 画像の一覧を閉じる', stripOpen: '▸ 画像の一覧を開く', stripTip: '画像の一覧を開く／閉じる（L）',
@@ -840,6 +890,7 @@ const I18N = {
       ['Home ×2', '1つ前の区間の先頭へ（2秒以内に2回）'],
       ['End / S', '今のポーズ／チェンジをスキップ'],
       ['[ / ]', '前の画像／次の画像（時間はそのまま）'],
+      ['Ctrl / Shift + クリック', '画像の一覧で、複数の画像を選ぶ（Esc で解除）'],
       ['Shift + R', 'リセット'],
       ['M', '音のオン／オフ'],
       ['1〜9', '保存したメニューを呼び出す（止まっているとき）'],
@@ -911,6 +962,12 @@ const I18N = {
     defaultSet: 'Set 1', newSet: '+ New set', newSetName: 'Set {n}', setName: 'Name for this set',
     renameSet: 'Rename', deleteSet: 'Delete set',
     undoDeleted: 'Image removed', undoDeletedN: 'Images removed ({n})', undo: 'Undo',
+    selectMode: 'Select', selectModeTip: 'Select images to reorder, move or delete them together (on a PC you can also Ctrl/Shift + click)',
+    selDone: 'Stop selecting', selCount: '{n} selected', selHint: 'Tap images to select them',
+    selFirst: '⇤ To start', selPrev: '◀ Earlier', selNext: 'Later ▶', selLast: 'To end ⇥',
+    selMoveSet: 'Move to set…', selStar: '★ Add', selUnstar: '★ Remove',
+    selSkip: '⊘ Don\'t use', selUnskip: '⊘ Use again', selDelete: 'Delete',
+    selAll: 'Select all', selClear: 'Clear', dragCount: '{n} images',
     deleteSetAsk: 'Delete "{name}" and its {n} images? Original image files saved on your computer are not deleted, but images added by URL or by pasting will no longer be available in the app.',
     lastSet: "You can't delete the only set.", setTabTip: 'Drag a thumbnail here to move it to this set',
     stripClose: '▾ Hide image list', stripOpen: '▸ Show image list', stripTip: 'Show / hide the image list (L)',
@@ -947,6 +1004,7 @@ const I18N = {
       ['Home ×2', 'Start of the previous one (twice in 2 s)'],
       ['End / S', 'Skip the current pose / change'],
       ['[ / ]', 'Previous / next image (the time keeps going)'],
+      ['Ctrl / Shift + click', 'Select several images in the image list (Esc to clear)'],
       ['Shift + R', 'Reset'],
       ['M', 'Sound on / off'],
       ['1–9', 'Load a saved menu (when stopped)'],
@@ -1209,6 +1267,9 @@ function openFavForm(add, def, onSave) {
 // 計測中のタイマーも止まってしまうため、代わりにページの中で表示する
 const UNDO_MS = 8000;           // 1枚ずつ消した画像を「元に戻す」で戻せる時間
 let undoStack = [], undoTimer = null;
+const selected = new Set();   // 画像の一覧で選んでいる画像の id
+let selAnchor = null;         // Shift＋クリックの起点
+let selectMode = false;       // タップで選ぶモード（スマホ・タブレット向け）
 function toast(msg, ms = 4000) {
   clearUndo();
   document.querySelector('.toast')?.remove();
@@ -1586,17 +1647,34 @@ function addUrls(urls) {
   const list = [...new Set(urls.map(u => u.trim()).filter(looksLikeUrl))];
   return addRecords(list.map(u => ({ name: u.startsWith('data:') ? 'image' : u.split('/').pop().split('?')[0], url: u })));
 }
-async function removeImage(id) {
-  const i = images.findIndex(im => im.id === id);
-  if (i < 0) return;
-  const wasCurrent = curId === id;
-  if (wasCurrent) { const n = stepImage(1, false); curId = n && n.id !== id ? n.id : null; }
-  const [im] = images.splice(i, 1);
-  revokeItem(im);
-  try { await idb.del(im.id); } catch (e) {}
+const removeImage = id => removeImages([id]);
+// 今の画像が ids に含まれるとき、代わりに表示する画像（今の画像の次から探し、ids 以外の最初の1枚）
+function nextOutside(ids) {
+  const list = setImgs(), i = list.findIndex(im => im.id === curId);
+  for (let n = 1; n <= list.length; n++) {
+    const im = list[(i + n) % list.length];
+    if (!ids.includes(im.id)) return im.id;
+  }
+  return null;
+}
+async function removeImages(ids) {
+  // 一覧の並び順に消す（元に戻すときは逆順に戻すと、元の位置にそろう）
+  const targets = images.filter(im => ids.includes(im.id));
+  if (!targets.length) return;
+  const oldCur = curId;
+  if (ids.includes(curId)) curId = nextOutside(ids);
+  const group = [];
+  for (const im of targets) {
+    const i = images.indexOf(im);
+    images.splice(i, 1);
+    revokeItem(im);
+    try { await idb.del(im.id); } catch (e) {}
+    group.push({ rec: im.rec, index: i, prevId: images[i - 1]?.id ?? null, wasCurrent: im.id === oldCur });
+  }
+  ids.forEach(id => selected.delete(id));
   saveOrder(); renderSets(); renderStrip(); showImage(curId);
-  // 8秒間は「元に戻す」で戻せるように、消した画像を覚えておく（新しい順に1枚ずつ戻す）
-  undoStack.push({ rec: im.rec, index: i, prevId: images[i - 1]?.id ?? null, wasCurrent: wasCurrent });
+  // 8秒間は「元に戻す」で戻せるように、消した画像を覚えておく（新しく消したものから、1回の削除ずつ戻す）
+  undoStack.push(group);
   showUndo();
 }
 
@@ -1622,24 +1700,28 @@ function showUndo() {
     el.append(msg, btn);
     document.body.append(el);
   }
-  const n = undoStack.length;
+  const n = undoStack.reduce((sum, g) => sum + g.length, 0);
   el.querySelector('.undo-msg').textContent = n > 1 ? t('undoDeletedN', { n }) : t('undoDeleted');
   el.querySelector('.undo-btn').textContent = t('undo');
   undoTimer = setTimeout(clearUndo, UNDO_MS);
 }
 async function undoRemove() {
-  const u = undoStack.pop();
-  if (!u) return;
-  const rec = u.rec;
-  // 消したあとでセットが削除されていたら、いま開いているセットに戻す
-  if (!settings.sets.some(st => st.id === rec.setId)) rec.setId = settings.curSet;
-  // 元の位置：消したときに前にあった画像のすぐ後ろ（見つからなければ同じ番号の位置）
-  let at = u.prevId ? images.findIndex(im => im.id === u.prevId) + 1 : 0;
-  if (u.prevId && at === 0) at = Math.min(u.index, images.length);
-  images.splice(at, 0, makeItem(rec));
-  try { await idb.put(rec); } catch (e) {}
+  const group = undoStack.pop();
+  if (!group) return;
+  let showId = null;
+  for (const u of [...group].reverse()) {
+    const rec = u.rec;
+    // 消したあとでセットが削除されていたら、いま開いているセットに戻す
+    if (!settings.sets.some(st => st.id === rec.setId)) rec.setId = settings.curSet;
+    // 元の位置：消したときに前にあった画像のすぐ後ろ（見つからなければ同じ番号の位置）
+    let at = u.prevId ? images.findIndex(im => im.id === u.prevId) + 1 : 0;
+    if (u.prevId && at === 0) at = Math.min(u.index, images.length);
+    images.splice(at, 0, makeItem(rec));
+    try { await idb.put(rec); } catch (e) {}
+    if (rec.setId === settings.curSet && (u.wasCurrent || (!curItem() && !showId))) showId = rec.id;
+  }
   saveOrder(); renderSets(); renderStrip();
-  if ((u.wasCurrent || !curItem()) && rec.setId === settings.curSet) showImage(rec.id);
+  if (showId) showImage(showId);
   showUndo();
 }
 function toggleFlag(im, key) {
@@ -1667,7 +1749,7 @@ function renderSets() {
     b.addEventListener('drop', e => {
       if (!e.dataTransfer.types.includes(DRAG_TYPE)) return;
       e.preventDefault(); e.stopPropagation(); b.classList.remove('drop');
-      moveToSet(e.dataTransfer.getData(DRAG_TYPE), s.id);
+      moveToSet(e.dataTransfer.getData(DRAG_TYPE).split(','), s.id);
     });
     box.append(b);
   });
@@ -1703,15 +1785,114 @@ function renderSets() {
 function switchSet(id) {
   settings.curSet = id; save();
   curId = setImgs()[0]?.id ?? null;
+  selected.clear();
   renderSets(); renderStrip(); showImage(curId);
 }
-function moveToSet(imgId, setId) {
-  const im = images.find(x => x.id === imgId);
-  if (!im || im.setId === setId) return;
-  if (curId === imgId) { const n = stepImage(1, false); curId = n && n.id !== imgId ? n.id : null; }
-  im.setId = im.rec.setId = setId;
-  persist(im); renderSets(); renderStrip(); showImage(curId);
+// 画像（1枚または複数）を、別のセットの末尾に移動する
+function moveToSet(ids, setId) {
+  const list = images.filter(im => ids.includes(im.id) && im.setId !== setId);
+  if (!list.length) return;
+  if (ids.includes(curId)) curId = nextOutside(ids);
+  list.forEach(im => { im.setId = im.rec.setId = setId; persist(im); });
+  ids.forEach(id => selected.delete(id));
+  // 移動先のセットでは、元からある画像の後ろに並べる
+  images = images.filter(im => !list.includes(im)).concat(list);
+  saveOrder(); renderSets(); renderStrip(); showImage(curId);
 }
+
+// ---- 複数選択 ----
+// PC：Ctrl（Mac は ⌘）＋クリックで1枚ずつ追加・解除、Shift＋クリックで範囲を選ぶ。
+// スマホ・タブレット：「選択」ボタンで選ぶモードにして、タップで選ぶ
+const selItems = () => setImgs().filter(im => selected.has(im.id));   // 一覧の並び順
+function clickThumb(e, im) {
+  const multi = e.ctrlKey || e.metaKey;
+  if (e.shiftKey) {
+    const list = setImgs();
+    const a = list.findIndex(x => x.id === (selAnchor ?? curId)), b = list.findIndex(x => x.id === im.id);
+    if (!multi) selected.clear();
+    if (a < 0) selected.add(im.id);
+    else list.slice(Math.min(a, b), Math.max(a, b) + 1).forEach(x => selected.add(x.id));
+  } else if (multi || selectMode) {
+    selected.has(im.id) ? selected.delete(im.id) : selected.add(im.id);
+    selAnchor = im.id;
+  } else {
+    // ふつうのクリック：選択をやめて、その画像を表示する
+    if (selected.size) { selected.clear(); refreshSel(); }
+    selAnchor = im.id;
+    showImage(im.id);
+    return;
+  }
+  refreshSel();
+}
+function clearSel() {
+  selected.clear(); selAnchor = null; selectMode = false;
+  refreshSel();
+}
+// サムネイルの印と、選択中のバーを今の状態に合わせる
+function refreshSel() {
+  const ids = new Set(setImgs().map(im => im.id));
+  [...selected].forEach(id => { if (!ids.has(id)) selected.delete(id); });   // 消えた・移った画像は選択から外す
+  $('strip').classList.toggle('selecting', selectMode);
+  document.querySelectorAll('.thumb').forEach(th => th.classList.toggle('sel', selected.has(th.dataset.id)));
+  $('selectBtn').classList.toggle('on', selectMode);
+  $('selectBtn').textContent = t(selectMode ? 'selDone' : 'selectMode');
+  const bar = $('selBar'), show = selectMode || selected.size > 0;
+  const changed = bar.classList.contains('hidden') === show;
+  bar.classList.toggle('hidden', !show);
+  if (show) {
+    const items = selItems(), n = items.length;
+    $('selCount').textContent = n ? t('selCount', { n }) : t('selHint');
+    bar.querySelectorAll('[data-sel-need]').forEach(b => b.disabled = !n);
+    const allStar = n && items.every(im => im.star), allSkip = n && items.every(im => im.skip);
+    $('selStar').textContent = t(allStar ? 'selUnstar' : 'selStar');
+    $('selSkip').textContent = t(allSkip ? 'selUnskip' : 'selSkip');
+    // セットへの移動：練習中や、ほかのセットがないときは使えない（セットのタブと同じ）
+    const others = settings.sets.filter(s => s.id !== settings.curSet);
+    const sel = $('selSet');
+    sel.innerHTML = '';
+    sel.append(new Option(t('selMoveSet'), ''));
+    others.forEach(s => sel.append(new Option(s.name, s.id)));
+    sel.disabled = !n || !others.length || active();
+  }
+  if (changed && curItem()) layoutFrame();   // バーの出し入れで、表示窓の高さが変わる
+}
+// 選んだ画像を、今のセットの中で並べ替える（ほかのセットの画像の位置は変えない）
+function reorderSel(fn) {
+  const list = setImgs();
+  const slots = list.map(im => images.indexOf(im));
+  const next = fn(list);
+  slots.forEach((pos, i) => { images[pos] = next[i]; });
+  saveOrder(); renderStrip();
+  document.querySelector('.thumb.sel')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+const isSel = im => selected.has(im.id);
+$('selFirst').onclick = () => reorderSel(list => list.filter(isSel).concat(list.filter(im => !isSel(im))));
+$('selLast').onclick = () => reorderSel(list => list.filter(im => !isSel(im)).concat(list.filter(isSel)));
+// 1つ前へ／後ろへ：選んだ画像を、選んでいない隣の画像と入れ替える
+$('selPrev').onclick = () => reorderSel(list => {
+  for (let i = 1; i < list.length; i++) if (isSel(list[i]) && !isSel(list[i - 1])) [list[i - 1], list[i]] = [list[i], list[i - 1]];
+  return list;
+});
+$('selNext').onclick = () => reorderSel(list => {
+  for (let i = list.length - 2; i >= 0; i--) if (isSel(list[i]) && !isSel(list[i + 1])) [list[i], list[i + 1]] = [list[i + 1], list[i]];
+  return list;
+});
+$('selSet').onchange = () => {
+  const setId = $('selSet').value;
+  if (setId) moveToSet(selItems().map(im => im.id), setId);
+};
+// ★・⊘：選んだ画像が全部ついていれば外し、そうでなければ全部につける
+const flagSel = key => {
+  const items = selItems(), on = !items.every(im => im[key]);
+  items.forEach(im => { im[key] = im.rec[key] = on; persist(im); });
+  renderStrip(); render();
+};
+$('selStar').onclick = () => flagSel('star');
+$('selSkip').onclick = () => flagSel('skip');
+$('selDel').onclick = () => removeImages(selItems().map(im => im.id));
+$('selAll').onclick = () => { setImgs().forEach(im => selected.add(im.id)); refreshSel(); };
+$('selClear').onclick = clearSel;
+$('selectBtn').onclick = () => { if (selectMode) clearSel(); else { selectMode = true; refreshSel(); } };
 
 function renderStrip() {
   const strip = $('strip');
@@ -1720,6 +1901,7 @@ function renderStrip() {
   const list = setImgs();
   if (!list.length) {
     strip.innerHTML = `<span class="none">${t('noImages')}</span>`;
+    refreshSel();
     return;
   }
   list.forEach((im, i) => {
@@ -1737,17 +1919,27 @@ function renderStrip() {
     img.onerror = () => { im.bad = true; if (!th.querySelector('.bad')) th.insertAdjacentHTML('beforeend', `<span class="bad">${t('imgBad')}</span>`); };
     img.loading = 'lazy'; img.decoding = 'async';
     img.src = im.thumbUrl || im.src;    // 小さな画像があればそちらを使う
-    th.onclick = e => { if (!e.target.closest('button')) showImage(im.id); };
+    th.onclick = e => { if (selectMode || !e.target.closest('button')) clickThumb(e, im); };
     th.querySelector('.del').onclick = () => removeImage(im.id);
     th.querySelector('.star').onclick = () => toggleFlag(im, 'star');
     th.querySelector('.skip').onclick = () => toggleFlag(im, 'skip');
-    // 並べ替え（ドラッグ＆ドロップ）。セットのタブにドロップすると、そのセットに移動
+    // 並べ替え（ドラッグ＆ドロップ）。セットのタブにドロップすると、そのセットに移動。
+    // 選んでいる画像をドラッグしたときは、選んだ画像をまとめて動かす
     th.addEventListener('dragstart', e => {
-      e.dataTransfer.setData(DRAG_TYPE, im.id);
+      const group = selected.has(im.id) && selected.size > 1 ? selItems().map(x => x.id) : [im.id];
+      e.dataTransfer.setData(DRAG_TYPE, group.join(','));
       e.dataTransfer.effectAllowed = 'move';
-      th.classList.add('dragging');
+      group.forEach(id => strip.querySelector(`.thumb[data-id="${id}"]`)?.classList.add('dragging'));
+      if (group.length > 1) {
+        // ドラッグ中の絵：「3枚」のような目印
+        const tag = document.createElement('div');
+        tag.className = 'drag-count'; tag.textContent = t('dragCount', { n: group.length });
+        document.body.append(tag);
+        e.dataTransfer.setDragImage(tag, -8, -8);
+        setTimeout(() => tag.remove());
+      }
     });
-    th.addEventListener('dragend', () => th.classList.remove('dragging'));
+    th.addEventListener('dragend', () => strip.querySelectorAll('.dragging').forEach(x => x.classList.remove('dragging')));
     th.addEventListener('dragover', e => {
       if (!e.dataTransfer.types.includes(DRAG_TYPE)) return;
       e.preventDefault();
@@ -1760,19 +1952,21 @@ function renderStrip() {
       if (!e.dataTransfer.types.includes(DRAG_TYPE)) return;
       e.preventDefault(); e.stopPropagation();
       const r = th.getBoundingClientRect(), after = e.clientX > r.left + r.width / 2;
-      moveImage(e.dataTransfer.getData(DRAG_TYPE), im.id, after);
+      moveImages(e.dataTransfer.getData(DRAG_TYPE).split(','), im.id, after);
     });
     strip.append(th);
   });
+  refreshSel();
   strip.querySelector('.thumb.cur')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
-function moveImage(fromId, toId, after) {
-  if (fromId === toId) { renderStrip(); return; }
-  const from = images.findIndex(im => im.id === fromId);
-  if (from < 0) return;
-  const [m] = images.splice(from, 1);
+// 画像（1枚または複数）を、toId の画像の前（after なら後ろ）に動かす。複数のときは並び順を保ったまま
+function moveImages(ids, toId, after) {
+  if (ids.includes(toId)) { renderStrip(); return; }
+  const moving = images.filter(im => ids.includes(im.id));
+  if (!moving.length) return;
+  images = images.filter(im => !ids.includes(im.id));
   const to = images.findIndex(im => im.id === toId);
-  images.splice(to + (after ? 1 : 0), 0, m);
+  images.splice(to + (after ? 1 : 0), 0, ...moving);
   saveOrder(); renderStrip();
 }
 // 画像の一覧の開け閉め（状態は覚えておく）
@@ -2259,6 +2453,7 @@ function render() {
   $('menuSet').disabled = active();
   lockFavs();
   document.querySelectorAll('.set-tab, .set-act').forEach(b => b.disabled = active());
+  $('selSet').disabled = !selected.size || active() || settings.sets.length < 2;
   $('subControls').classList.toggle('hidden', !active());
   ring.classList.toggle('active', active());
 
@@ -2643,6 +2838,7 @@ document.addEventListener('keydown', e => {
   if (e.ctrlKey || e.altKey || e.metaKey) return;          // ブラウザのショートカットは邪魔しない
   if (e.target.matches?.('input[type=number], input[type=text], input[type=range], select')) return;   // 入力中は無視
   const helpOpen = !$('help').classList.contains('hidden');
+  if (e.key === 'Escape' && !helpOpen && (selected.size || selectMode)) { clearSel(); return; }
   if (e.key === 'Escape' || (helpOpen && e.key === '?')) { toggleHelp(false); return; }
   if (helpOpen) return;
   let handled = true;
